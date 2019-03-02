@@ -1,0 +1,65 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  labels:
+    app: blackbox-exporter
+  name: blackbox-exporter
+  namespace: kube-prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blackbox-exporter
+  template:
+    metadata:
+      labels:
+        app: blackbox-exporter
+    spec:
+      containers:
+      - image: prom/blackbox-exporter:v0.12.0
+        name: blackbox-exporter
+        args:
+        - --config.file=/etc/blackbox_exporter/blackbox.yml
+        - --log.level=debug
+        - --web.listen-address=:9115
+        ports:
+        - containerPort: 9115
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /etc/blackbox_exporter
+          name: config-volume
+        resources:
+          requests:
+            cpu: 100m
+            memory: 50Mi
+          limits:
+            cpu: 200m
+            memory: 100Mi
+      volumes:
+      - name: config-volume
+        configMap:
+          name: blackbox-exporter-config
+      nodeSelector:
+        kubernetes.io/role: master
+      tolerations:
+        - key: "dedicated"
+          value: "master"
+          effect: "NoSchedule"
+---
+kind: Service
+apiVersion: v1
+metadata:
+  annotations:
+    prometheus.io/scrape: 'true'
+  labels:
+    app: blackbox-exporter
+  name: blackbox-exporter
+  namespace: kube-prometheus
+spec:
+  type: NodePort
+  ports:
+  - port: 9115
+    targetPort: 9115
+    protocol: TCP
+  selector:
+    app: blackbox-exporter
